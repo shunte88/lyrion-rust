@@ -1,5 +1,7 @@
 # Lyrion Music Server - Rust Edition
 
+## no further development here - the official Lyrion solution is awesome so the value add here is minimnal
+
 Complete rewrite of Lyrion Music Server (formerly Logitech Media Server / Slimserver) from Perl to Rust.
 
 ## Current Status: Phase 2 - Playback Pipeline ✅
