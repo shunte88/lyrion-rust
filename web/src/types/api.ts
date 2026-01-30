@@ -90,4 +90,6 @@ export interface NowPlayingState {
   volume: number;
   playlist: Track[];
   playlist_index: number;
+  shuffle: number; // 0=off, 1=songs, 2=albums
+  repeat: number; // 0=off, 1=song, 2=playlist
 }

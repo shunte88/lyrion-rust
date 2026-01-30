@@ -35,7 +35,7 @@ export class LyrionAPI {
   // JSON-RPC
   static async jsonrpc<T = unknown>(
     playerId: string,
-    command: string[],
+    command: (string | number)[],
     id?: number | string
   ): Promise<JsonRpcResponse<T>> {
     const request: JsonRpcRequest = {
@@ -84,8 +84,24 @@ export class LyrionAPI {
     return this.jsonrpc(playerId, ['mixer', 'volume', volume.toString()]);
   }
 
+  static async seek(playerId: string, position: number) {
+    return this.jsonrpc(playerId, ['time', position.toString()]);
+  }
+
   static async getStatus(playerId: string) {
     return this.jsonrpc(playerId, ['status', '-', '1', 'tags:adlty']);
+  }
+
+  static async getPlaylist(playerId: string) {
+    return this.jsonrpc(playerId, ['playlist', 'tracks', 0, 100]);
+  }
+
+  static async setShuffle(playerId: string, mode: 0 | 1 | 2) {
+    return this.jsonrpc(playerId, ['playlist', 'shuffle', mode]);
+  }
+
+  static async setRepeat(playerId: string, mode: 0 | 1 | 2) {
+    return this.jsonrpc(playerId, ['playlist', 'repeat', mode]);
   }
 
   // Sync commands
@@ -107,11 +123,11 @@ export class LyrionAPI {
   }
 
   static async addTrack(playerId: string, trackId: number) {
-    return this.jsonrpc(playerId, ['playlist', 'add', `track_id:${trackId}`]);
+    return this.jsonrpc(playerId, ['playlistcontrol', 'cmd:add', 'item_id', trackId]);
   }
 
   static async clearPlaylist(playerId: string) {
-    return this.jsonrpc(playerId, ['playlist', 'clear']);
+    return this.jsonrpc(playerId, ['playlistcontrol', 'cmd:clear']);
   }
 
   // Streaming URL

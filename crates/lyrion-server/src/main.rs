@@ -14,7 +14,7 @@ use axum::{
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
-use tokio::sync::RwLock;
+use tokio::sync::{RwLock, broadcast};
 use tower_http::services::ServeDir;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -41,6 +41,7 @@ pub struct AppState {
     pub sync_coordinator: Arc<SyncCoordinator>,
     pub plugin_manager: Arc<RwLock<PluginManager>>,
     pub playlist_manager: Arc<playlist::PlaylistManager>,
+    pub ws_broadcast: broadcast::Sender<websocket::WsMessage>,
 }
 
 #[tokio::main]
@@ -152,16 +153,56 @@ async fn main() -> Result<()> {
 
     let plugin_manager = Arc::new(RwLock::new(plugin_manager));
 
+    // Create WebSocket broadcast channel (before message handler so it can use it)
+    let (ws_tx, _) = broadcast::channel::<websocket::WsMessage>(100);
+
     // Spawn message handler task
     let sync_manager_clone = Arc::clone(&sync_manager);
+    let ws_broadcast_clone = ws_tx.clone();
+    let slimproto_clone_for_msg = Arc::clone(&slimproto_server);
     tokio::spawn(async move {
+        use std::collections::HashMap;
+        use std::time::Instant;
+
+        // Track last broadcast time per player for debouncing
+        let mut last_broadcast: HashMap<String, Instant> = HashMap::new();
+
         while let Some((mac, message)) = message_rx.recv().await {
             tracing::debug!("Processing message from {}: {:?}", mac, message);
 
-            // Handle STAT messages to update play points
+            // Handle STAT messages to update play points and broadcast progress
             if let SlimprotoMessage::Stat(stat) = &message {
-                // TODO: Extract player ID from MAC and update play point
-                // sync_manager_clone.update_play_point(player_id, position).await;
+                // Extract position from STAT message
+                let position_secs = stat.elapsed_seconds as f64 +
+                                   (stat.elapsed_milliseconds as f64 / 1000.0);
+
+                // Get player ID from MAC - look up from get_players()
+                let players = slimproto_clone_for_msg.get_players().await;
+                if let Some((_, player_conn)) = players.iter().find(|(player_mac, _)| player_mac == &mac) {
+                    if let Some(ref uuid) = player_conn.uuid {
+                        let player_id = uuid.clone();
+
+                        // Debounce: only broadcast if > 950ms since last update
+                        let should_broadcast = last_broadcast
+                            .get(&player_id)
+                            .map(|last| last.elapsed().as_millis() > 950)
+                            .unwrap_or(true);
+
+                        if should_broadcast {
+                            // Broadcast progress update
+                            let _ = ws_broadcast_clone.send(websocket::WsMessage::ProgressUpdate(
+                                websocket::ProgressUpdateEvent {
+                                    player_id: player_id.clone(),
+                                    position: position_secs,
+                                    duration: 0.0, // TODO: Get actual duration from track
+                                }
+                            ));
+
+                            last_broadcast.insert(player_id, Instant::now());
+                        }
+                    }
+                }
+
                 tracing::debug!("STAT message: elapsed={}s {}ms",
                     stat.elapsed_seconds, stat.elapsed_milliseconds);
             }
@@ -179,6 +220,7 @@ async fn main() -> Result<()> {
         sync_coordinator,
         plugin_manager,
         playlist_manager,
+        ws_broadcast: ws_tx,
     };
 
     // Build HTTP router

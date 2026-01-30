@@ -7,6 +7,7 @@ import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { MobileNav } from './components/MobileNav';
 import { PlayerBar } from './components/PlayerBar';
+import { GlobalProgressBar } from './components/GlobalProgressBar';
 import { NowPlayingSheet } from './components/NowPlayingSheet';
 import { NowPlayingPage } from './pages/NowPlaying';
 import { LibraryPage } from './pages/Library';
@@ -49,11 +50,12 @@ export function App() {
                   collapsed: { mobile: !sidebarOpen, desktop: !sidebarOpen },
                 }
           }
-          footer={{ height: isMobile ? 60 : 100 }} // Only mobile nav on mobile
+          footer={isMobile ? { height: 60 } : undefined} // Only mobile nav on mobile
           padding="md"
         >
           <AppShell.Header>
             <Header />
+            <GlobalProgressBar />
           </AppShell.Header>
 
           {!isMobile && (
@@ -75,10 +77,11 @@ export function App() {
             </Routes>
           </AppShell.Main>
 
-          <AppShell.Footer>
-            {!isMobile && <PlayerBar />}
-            {isMobile && <MobileNav />}
-          </AppShell.Footer>
+          {isMobile && (
+            <AppShell.Footer>
+              <MobileNav />
+            </AppShell.Footer>
+          )}
         </AppShell>
 
         {/* Mobile Now Playing Sheet */}

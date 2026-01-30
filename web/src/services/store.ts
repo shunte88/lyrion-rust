@@ -44,6 +44,8 @@ export const useAppStore = create<AppState>((set) => ({
     volume: 50,
     playlist: [],
     playlist_index: 0,
+    shuffle: 0,
+    repeat: 0,
   },
   setNowPlaying: (state) =>
     set((prev) => ({

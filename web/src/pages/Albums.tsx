@@ -3,6 +3,7 @@ import { Stack, Title, SimpleGrid, Card, Image, Text, Group, ActionIcon, Loader,
 import { IconPlayerPlay, IconRefresh } from '@tabler/icons-react';
 import { useAppStore } from '../services/store';
 import { LyrionAPI } from '../services/api';
+import { playTracks } from '../services/playerUtils';
 import { notifications } from '@mantine/notifications';
 import type { Track } from '../types/api';
 
@@ -82,12 +83,9 @@ export function AlbumsPage() {
     if (albumTracks.length === 0) return;
 
     try {
-      // Clear playlist and add all tracks
-      await LyrionAPI.clearPlaylist(currentPlayer.id);
-      for (const track of albumTracks) {
-        await LyrionAPI.addTrack(currentPlayer.id, track.id);
-      }
-      await LyrionAPI.play(currentPlayer.id);
+      // Play all tracks in the album
+      const trackIds = albumTracks.map((t) => t.id);
+      await playTracks(currentPlayer.mac || currentPlayer.id || currentPlayer.uuid || '', trackIds);
 
       notifications.show({
         title: 'Playing Album',

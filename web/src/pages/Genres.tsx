@@ -3,6 +3,7 @@ import { Stack, Title, Card, Text, Group, ActionIcon, Loader, SimpleGrid, Badge 
 import { IconPlayerPlay, IconRefresh } from '@tabler/icons-react';
 import { useAppStore } from '../services/store';
 import { LyrionAPI } from '../services/api';
+import { playTracks } from '../services/playerUtils';
 import { notifications } from '@mantine/notifications';
 
 interface Genre {
@@ -65,13 +66,9 @@ export function GenresPage() {
     if (genreTracks.length === 0) return;
 
     try {
-      // Clear playlist and add all tracks
-      await LyrionAPI.clearPlaylist(currentPlayer.id);
-      for (const track of genreTracks.slice(0, 50)) {
-        // Limit to 50 tracks
-        await LyrionAPI.addTrack(currentPlayer.id, track.id);
-      }
-      await LyrionAPI.play(currentPlayer.id);
+      // Play tracks from this genre (limit to 50)
+      const trackIds = genreTracks.slice(0, 50).map((t) => t.id);
+      await playTracks(currentPlayer.mac || currentPlayer.id || currentPlayer.uuid || '', trackIds);
 
       notifications.show({
         title: 'Playing Genre',

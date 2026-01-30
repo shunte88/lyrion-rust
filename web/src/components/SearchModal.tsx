@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Modal, TextInput, Stack, Text, Group, ActionIcon, ScrollArea, Divider, Badge } from '@mantine/core';
+import { Modal, TextInput, Stack, Text, Group, ActionIcon, ScrollArea, Divider, Badge, Loader, Center, Alert } from '@mantine/core';
 import { IconSearch, IconPlayerPlay, IconDisc, IconMicrophone, IconMusic } from '@tabler/icons-react';
 import { useAppStore } from '../services/store';
 import { LyrionAPI } from '../services/api';
+import { playTrack } from '../services/playerUtils';
 import { notifications } from '@mantine/notifications';
 import type { Track } from '../types/api';
 import { useDebouncedValue } from '@mantine/hooks';
@@ -19,7 +20,6 @@ interface SearchResults {
 }
 
 export function SearchModal({ opened, onClose }: SearchModalProps) {
-  const { tracks } = useAppStore();
   const [query, setQuery] = useState('');
   const [debouncedQuery] = useDebouncedValue(query, 200);
   const [results, setResults] = useState<SearchResults>({
@@ -27,50 +27,64 @@ export function SearchModal({ opened, onClose }: SearchModalProps) {
     albums: new Map(),
     artists: new Set(),
   });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!debouncedQuery.trim()) {
+    if (!debouncedQuery.trim() || debouncedQuery.length < 2) {
       setResults({ tracks: [], albums: new Map(), artists: new Set() });
+      setLoading(false);
       return;
     }
 
-    const searchLower = debouncedQuery.toLowerCase();
+    const controller = new AbortController();
 
-    // Search tracks
-    const matchingTracks = tracks.filter(
-      (t) =>
-        t.title?.toLowerCase().includes(searchLower) ||
-        t.artist?.toLowerCase().includes(searchLower) ||
-        t.album?.toLowerCase().includes(searchLower) ||
-        t.genre?.toLowerCase().includes(searchLower)
-    ).slice(0, 20); // Limit to 20 results
+    const searchTracks = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        // Call backend API
+        const matchingTracks = await LyrionAPI.searchTracks(debouncedQuery, 100);
 
-    // Extract albums
-    const albumsMap = new Map<string, { name: string; artist: string; tracks: Track[] }>();
-    matchingTracks.forEach((track) => {
-      const albumKey = `${track.album || 'Unknown'}::${track.artist || 'Unknown'}`;
-      if (!albumsMap.has(albumKey)) {
-        albumsMap.set(albumKey, {
-          name: track.album || 'Unknown Album',
-          artist: track.artist || 'Unknown Artist',
-          tracks: [],
+        // Extract albums
+        const albumsMap = new Map<string, { name: string; artist: string; tracks: Track[] }>();
+        matchingTracks.forEach((track) => {
+          const albumKey = `${track.album || 'Unknown'}::${track.artist || 'Unknown'}`;
+          if (!albumsMap.has(albumKey)) {
+            albumsMap.set(albumKey, {
+              name: track.album || 'Unknown Album',
+              artist: track.artist || 'Unknown Artist',
+              tracks: [],
+            });
+          }
+          albumsMap.get(albumKey)!.tracks.push(track);
         });
+
+        // Extract artists
+        const artistsSet = new Set<string>();
+        matchingTracks.forEach((track) => {
+          if (track.artist) artistsSet.add(track.artist);
+        });
+
+        setResults({
+          tracks: matchingTracks,
+          albums: albumsMap,
+          artists: artistsSet,
+        });
+      } catch (err: any) {
+        if (err.name !== 'AbortError') {
+          setError('Search failed. Please try again.');
+          console.error('Search error:', err);
+        }
+      } finally {
+        setLoading(false);
       }
-      albumsMap.get(albumKey)!.tracks.push(track);
-    });
+    };
 
-    // Extract artists
-    const artistsSet = new Set<string>();
-    matchingTracks.forEach((track) => {
-      if (track.artist) artistsSet.add(track.artist);
-    });
+    searchTracks();
 
-    setResults({
-      tracks: matchingTracks,
-      albums: albumsMap,
-      artists: artistsSet,
-    });
-  }, [debouncedQuery, tracks]);
+    return () => controller.abort();
+  }, [debouncedQuery]);
 
   const handlePlayTrack = async (track: Track) => {
     const { currentPlayer } = useAppStore.getState();
@@ -84,9 +98,7 @@ export function SearchModal({ opened, onClose }: SearchModalProps) {
     }
 
     try {
-      await LyrionAPI.clearPlaylist(currentPlayer.id);
-      await LyrionAPI.addTrack(currentPlayer.id, track.id);
-      await LyrionAPI.play(currentPlayer.id);
+      await playTrack(currentPlayer.mac || currentPlayer.id || currentPlayer.uuid || '', track.id);
 
       notifications.show({
         title: 'Playing Track',
@@ -127,10 +139,33 @@ export function SearchModal({ opened, onClose }: SearchModalProps) {
           size="md"
         />
 
+        {/* Error Alert */}
+        {error && (
+          <Alert color="red" title="Error">
+            {error}
+          </Alert>
+        )}
+
         <ScrollArea h={500}>
           <Stack gap="lg">
+            {/* Loading State */}
+            {loading && (
+              <Center py="xl">
+                <Loader size="lg" />
+              </Center>
+            )}
+
+            {/* Minimum Query Length Hint */}
+            {debouncedQuery.trim().length > 0 && debouncedQuery.trim().length < 2 && !loading && (
+              <Center py="xl">
+                <Text c="dimmed" ta="center">
+                  Type at least 2 characters to search
+                </Text>
+              </Center>
+            )}
+
             {/* Tracks Section */}
-            {results.tracks.length > 0 && (
+            {!loading && results.tracks.length > 0 && (
               <div>
                 <Group gap="xs" mb="sm">
                   <IconMusic size={18} />
@@ -179,7 +214,7 @@ export function SearchModal({ opened, onClose }: SearchModalProps) {
             )}
 
             {/* Albums Section */}
-            {results.albums.size > 0 && (
+            {!loading && results.albums.size > 0 && (
               <>
                 <Divider />
                 <div>
@@ -216,7 +251,7 @@ export function SearchModal({ opened, onClose }: SearchModalProps) {
             )}
 
             {/* Artists Section */}
-            {results.artists.size > 0 && (
+            {!loading && results.artists.size > 0 && (
               <>
                 <Divider />
                 <div>
@@ -248,20 +283,28 @@ export function SearchModal({ opened, onClose }: SearchModalProps) {
             )}
 
             {/* No Results */}
-            {debouncedQuery.trim() &&
+            {!loading &&
+              debouncedQuery.trim().length >= 2 &&
               results.tracks.length === 0 &&
               results.albums.size === 0 &&
               results.artists.size === 0 && (
-                <Text c="dimmed" ta="center" py="xl">
-                  No results found for "{debouncedQuery}"
-                </Text>
+                <Center py="xl">
+                  <Stack align="center" gap="xs">
+                    <IconSearch size={48} stroke={1.5} style={{ opacity: 0.3 }} />
+                    <Text c="dimmed" ta="center">
+                      No results found for "{debouncedQuery}"
+                    </Text>
+                  </Stack>
+                </Center>
               )}
 
             {/* Empty State */}
-            {!debouncedQuery.trim() && (
-              <Text c="dimmed" ta="center" py="xl">
-                Start typing to search your music library
-              </Text>
+            {!loading && !debouncedQuery.trim() && (
+              <Center py="xl">
+                <Text c="dimmed" ta="center">
+                  Start typing to search your music library
+                </Text>
+              </Center>
             )}
           </Stack>
         </ScrollArea>

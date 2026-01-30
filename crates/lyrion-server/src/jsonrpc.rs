@@ -111,13 +111,30 @@ async fn handle_slim_request(
     // Handle commands
     match command {
         "status" => {
-            // Return player status stub
+            // Return actual player status
+            let playlist = state.playlist_manager.get_playlist(player_id).await;
+
+            let tracks: Vec<_> = playlist.all_tracks().iter().enumerate().map(|(i, track)| {
+                json!({
+                    "playlist index": i,
+                    "id": track.id,
+                    "title": track.title,
+                    "artist": track.artist,
+                    "album": track.album,
+                })
+            }).collect();
+
+            // Use actual playing state from playlist
+            let mode = if playlist.playing { "play" } else { "stop" };
+
             Ok(json!({
                 "player_id": player_id,
-                "mode": "stop",
-                "time": 0,
-                "duration": 0,
-                "playlist_loop": []
+                "mode": mode,
+                "time": 0, // TODO: Get actual position
+                "duration": 0, // TODO: Get actual duration
+                "playlist_loop": tracks,
+                "playlist_cur_index": playlist.current_index.unwrap_or(0),
+                "mixer_volume": 50, // TODO: Get actual volume
             }))
         }
         "play" => {
@@ -230,6 +247,21 @@ async fn handle_slim_request(
                 }
 
                 tracing::info!("Play command completed successfully");
+
+                // Update playlist playing state
+                state.playlist_manager.set_playing(player_id, true).await;
+
+                // Broadcast status update to WebSocket clients
+                let _ = state.ws_broadcast.send(crate::websocket::WsMessage::PlayerStatus(
+                    crate::websocket::PlayerStatusUpdate {
+                        player_id: player_id.to_string(),
+                        playing: true,
+                        position: Some(0.0),
+                        volume: None,
+                        current_track_id: Some(track_id),
+                    }
+                ));
+
                 Ok(json!({
                     "player_id": player_id,
                     "command": "play",
@@ -249,6 +281,20 @@ async fn handle_slim_request(
                         code: -32603,
                         message: format!("Failed to send command to player: {}", e),
                     })?;
+
+                // Update playlist playing state
+                state.playlist_manager.set_playing(player_id, true).await;
+
+                // Broadcast status update to WebSocket clients
+                let _ = state.ws_broadcast.send(crate::websocket::WsMessage::PlayerStatus(
+                    crate::websocket::PlayerStatusUpdate {
+                        player_id: player_id.to_string(),
+                        playing: true,
+                        position: None,
+                        volume: None,
+                        current_track_id: None,
+                    }
+                ));
 
                 Ok(json!({
                     "player_id": player_id,
@@ -280,6 +326,20 @@ async fn handle_slim_request(
                         message: format!("Failed to send pause command: {}", e),
                     })?;
 
+                // Update playlist playing state
+                state.playlist_manager.set_playing(player_id, false).await;
+
+                // Broadcast status update to WebSocket clients
+                let _ = state.ws_broadcast.send(crate::websocket::WsMessage::PlayerStatus(
+                    crate::websocket::PlayerStatusUpdate {
+                        player_id: player_id.to_string(),
+                        playing: false,
+                        position: None,
+                        volume: None,
+                        current_track_id: None,
+                    }
+                ));
+
                 Ok(json!({
                     "player_id": player_id,
                     "command": "pause",
@@ -299,6 +359,20 @@ async fn handle_slim_request(
                         message: format!("Failed to send unpause command: {}", e),
                     })?;
 
+                // Update playlist playing state
+                state.playlist_manager.set_playing(player_id, true).await;
+
+                // Broadcast status update to WebSocket clients
+                let _ = state.ws_broadcast.send(crate::websocket::WsMessage::PlayerStatus(
+                    crate::websocket::PlayerStatusUpdate {
+                        player_id: player_id.to_string(),
+                        playing: true,
+                        position: None,
+                        volume: None,
+                        current_track_id: None,
+                    }
+                ));
+
                 Ok(json!({
                     "player_id": player_id,
                     "command": "pause",
@@ -317,6 +391,20 @@ async fn handle_slim_request(
                     code: -32603,
                     message: format!("Failed to send stop command: {}", e),
                 })?;
+
+            // Update playlist playing state
+            state.playlist_manager.set_playing(player_id, false).await;
+
+            // Broadcast status update to WebSocket clients
+            let _ = state.ws_broadcast.send(crate::websocket::WsMessage::PlayerStatus(
+                crate::websocket::PlayerStatusUpdate {
+                    player_id: player_id.to_string(),
+                    playing: false,
+                    position: Some(0.0),
+                    volume: None,
+                    current_track_id: None,
+                }
+            ));
 
             Ok(json!({
                 "player_id": player_id,
@@ -494,6 +582,17 @@ async fn handle_slim_request(
                     code: -32603,
                     message: format!("Failed to send volume command: {}", e),
                 })?;
+
+            // Broadcast volume update to WebSocket clients
+            let _ = state.ws_broadcast.send(crate::websocket::WsMessage::PlayerStatus(
+                crate::websocket::PlayerStatusUpdate {
+                    player_id: player_id.to_string(),
+                    playing: true,
+                    position: None,
+                    volume: Some(new_volume as i32),
+                    current_track_id: None,
+                }
+            ));
 
             Ok(json!({
                 "player_id": player_id,
@@ -853,25 +952,99 @@ async fn handle_slim_request(
             }
         }
         "playlist" => {
-            // Get current playlist
-            // Format: ["playlist", "tracks", start, count]
-            let playlist = state.playlist_manager.get_playlist(player_id).await;
+            // Playlist commands
+            // Format: ["playlist", subcommand, ...args]
+            if command_array.len() < 2 {
+                return Err(JsonRpcError {
+                    code: -32602,
+                    message: "playlist command requires subcommand".to_string(),
+                });
+            }
 
-            let tracks: Vec<_> = playlist.all_tracks().iter().enumerate().map(|(i, track)| {
-                json!({
-                    "playlist index": i,
-                    "id": track.id,
-                    "title": track.title,
-                    "artist": track.artist,
-                    "album": track.album,
-                })
-            }).collect();
+            let subcmd = command_array[1]
+                .as_str()
+                .ok_or(JsonRpcError {
+                    code: -32602,
+                    message: "playlist subcommand must be a string".to_string(),
+                })?;
 
-            Ok(json!({
-                "player_id": player_id,
-                "count": playlist.len(),
-                "playlist_loop": tracks
-            }))
+            match subcmd {
+                "tracks" => {
+                    // Get current playlist
+                    let playlist = state.playlist_manager.get_playlist(player_id).await;
+
+                    let tracks: Vec<_> = playlist.all_tracks().iter().enumerate().map(|(i, track)| {
+                        json!({
+                            "playlist index": i,
+                            "id": track.id,
+                            "title": track.title,
+                            "artist": track.artist,
+                            "album": track.album,
+                        })
+                    }).collect();
+
+                    Ok(json!({
+                        "player_id": player_id,
+                        "count": playlist.len(),
+                        "playlist_loop": tracks
+                    }))
+                }
+                "shuffle" => {
+                    // Shuffle command: ["playlist", "shuffle", mode]
+                    // mode: 0=off, 1=songs, 2=albums
+                    if command_array.len() < 3 {
+                        return Err(JsonRpcError {
+                            code: -32602,
+                            message: "shuffle requires mode (0, 1, or 2)".to_string(),
+                        });
+                    }
+
+                    let mode = command_array[2]
+                        .as_i64()
+                        .or_else(|| command_array[2].as_str().and_then(|s| s.parse::<i64>().ok()))
+                        .ok_or(JsonRpcError {
+                            code: -32602,
+                            message: "shuffle mode must be a number".to_string(),
+                        })?;
+
+                    // Store shuffle mode (0-2)
+                    state.playlist_manager.set_shuffle(player_id, mode as u8).await;
+
+                    Ok(json!({
+                        "player_id": player_id,
+                        "shuffle": mode
+                    }))
+                }
+                "repeat" => {
+                    // Repeat command: ["playlist", "repeat", mode]
+                    // mode: 0=off, 1=song, 2=playlist
+                    if command_array.len() < 3 {
+                        return Err(JsonRpcError {
+                            code: -32602,
+                            message: "repeat requires mode (0, 1, or 2)".to_string(),
+                        });
+                    }
+
+                    let mode = command_array[2]
+                        .as_i64()
+                        .or_else(|| command_array[2].as_str().and_then(|s| s.parse::<i64>().ok()))
+                        .ok_or(JsonRpcError {
+                            code: -32602,
+                            message: "repeat mode must be a number".to_string(),
+                        })?;
+
+                    // Store repeat mode (0-2)
+                    state.playlist_manager.set_repeat(player_id, mode as u8).await;
+
+                    Ok(json!({
+                        "player_id": player_id,
+                        "repeat": mode
+                    }))
+                }
+                _ => Ok(json!({
+                    "error": format!("Unknown playlist subcommand: {}", subcmd)
+                })),
+            }
         }
         _ => Ok(json!({
             "error": format!("Command '{}' not yet implemented", command)

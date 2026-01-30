@@ -4,6 +4,7 @@ import { useMediaQuery } from '@mantine/hooks';
 import { IconPlayerPlay, IconRefresh } from '@tabler/icons-react';
 import { useAppStore } from '../services/store';
 import { LyrionAPI } from '../services/api';
+import { playTrack } from '../services/playerUtils';
 import { notifications } from '@mantine/notifications';
 import { TrackCard } from '../components/TrackCard';
 import type { Track } from '../types/api';
@@ -45,9 +46,7 @@ export function TracksPage() {
     }
 
     try {
-      await LyrionAPI.clearPlaylist(currentPlayer.id);
-      await LyrionAPI.addTrack(currentPlayer.id, track.id);
-      await LyrionAPI.play(currentPlayer.id);
+      await playTrack(currentPlayer.mac || currentPlayer.id || currentPlayer.uuid || '', track.id);
 
       notifications.show({
         title: 'Playing Track',

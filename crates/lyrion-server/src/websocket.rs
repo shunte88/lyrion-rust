@@ -71,7 +71,7 @@ pub async fn websocket_handler(
 }
 
 /// Handle individual WebSocket connection
-async fn handle_socket(mut socket: WebSocket, _state: AppState) {
+async fn handle_socket(mut socket: WebSocket, state: AppState) {
     // Send initial connection message
     let welcome = WsMessage::PlayerStatus(PlayerStatusUpdate {
         player_id: "system".to_string(),
@@ -89,16 +89,33 @@ async fn handle_socket(mut socket: WebSocket, _state: AppState) {
 
     tracing::info!("WebSocket client connected");
 
-    // In a real implementation, this would:
-    // 1. Subscribe to a global broadcast channel
-    // 2. Forward player status updates to this client
-    // 3. Handle client messages (subscriptions, commands, etc.)
-
-    // For now, just handle incoming messages and keep connection alive
+    // Subscribe to broadcast channel for player status updates
+    let mut ws_rx = state.ws_broadcast.subscribe();
     let mut ping_interval = tokio::time::interval(tokio::time::Duration::from_secs(30));
 
     loop {
         tokio::select! {
+            // Receive messages from broadcast channel and forward to client
+            msg = ws_rx.recv() => {
+                match msg {
+                    Ok(ws_msg) => {
+                        if let Ok(json) = serde_json::to_string(&ws_msg) {
+                            if socket.send(Message::Text(json)).await.is_err() {
+                                tracing::warn!("Failed to send message to WebSocket client");
+                                break;
+                            }
+                        }
+                    }
+                    Err(broadcast::error::RecvError::Lagged(skipped)) => {
+                        tracing::warn!("WebSocket client lagged, skipped {} messages", skipped);
+                    }
+                    Err(broadcast::error::RecvError::Closed) => {
+                        tracing::error!("Broadcast channel closed");
+                        break;
+                    }
+                }
+            }
+            // Handle messages from client
             msg = socket.recv() => {
                 match msg {
                     Some(Ok(Message::Text(text))) => {
@@ -120,8 +137,8 @@ async fn handle_socket(mut socket: WebSocket, _state: AppState) {
                     _ => {}
                 }
             }
+            // Send periodic ping to keep connection alive
             _ = ping_interval.tick() => {
-                // Send periodic ping to keep connection alive
                 if socket.send(Message::Ping(vec![])).await.is_err() {
                     tracing::warn!("Failed to send ping, closing connection");
                     break;
@@ -130,6 +147,3 @@ async fn handle_socket(mut socket: WebSocket, _state: AppState) {
         }
     }
 }
-
-// TODO: Add global broadcast channel to AppState for sending updates to all connected clients
-// For now, this is a stub that demonstrates the structure

@@ -1,12 +1,26 @@
 // React hook for WebSocket connection and real-time updates
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { websocketService, type WebSocketMessage } from '../services/websocket';
 import { useAppStore } from '../services/store';
+import { updatePlayerStatus } from '../services/playerUtils';
 
 export function useWebSocket() {
   const [connected, setConnected] = useState(false);
   const { setNowPlaying, currentPlayer } = useAppStore();
+  const prevPlayerIdRef = useRef<string | null>(null);
+
+  // Watch for player changes and fetch status
+  useEffect(() => {
+    if (currentPlayer && currentPlayer.id) {
+      if (currentPlayer.id !== prevPlayerIdRef.current) {
+        console.log('[useWebSocket] Player changed, fetching status for:', currentPlayer.id);
+        prevPlayerIdRef.current = currentPlayer.id;
+        // Fetch status for the newly selected player
+        updatePlayerStatus(currentPlayer.id);
+      }
+    }
+  }, [currentPlayer]);
 
   useEffect(() => {
     // Connect to WebSocket (with error handling)
@@ -14,6 +28,12 @@ export function useWebSocket() {
       websocketService.connect();
     } catch (error) {
       console.error('[useWebSocket] Failed to connect:', error);
+    }
+
+    // Fetch initial status if a player is already selected (on page load/refresh)
+    if (currentPlayer && currentPlayer.id) {
+      console.log('[useWebSocket] Initial mount - fetching status for current player:', currentPlayer.id);
+      updatePlayerStatus(currentPlayer.id);
     }
 
     // Subscribe to connection status
@@ -35,6 +55,16 @@ export function useWebSocket() {
               state.nowPlaying.position + 0.95,
               state.nowPlaying.duration
             );
+
+            // Check if track completed
+            if (newPosition >= state.nowPlaying.duration - 0.5) {
+              // Track is about to end, poll status to see what's next
+              console.log('[useWebSocket] Track completion detected, polling status');
+              if (currentPlayer.id) {
+                updatePlayerStatus(currentPlayer.id);
+              }
+            }
+
             return {
               nowPlaying: {
                 ...state.nowPlaying,
@@ -47,11 +77,20 @@ export function useWebSocket() {
       }
     }, 950);
 
+    // Periodic status polling - refresh every 10 seconds to catch state changes
+    const statusPollInterval = setInterval(() => {
+      if (currentPlayer && currentPlayer.id) {
+        console.log('[useWebSocket] Periodic status poll');
+        updatePlayerStatus(currentPlayer.id);
+      }
+    }, 10000);
+
     // Cleanup
     return () => {
       unsubscribeConnection();
       unsubscribeMessages();
       clearInterval(progressInterval);
+      clearInterval(statusPollInterval);
       websocketService.disconnect();
     };
   }, [currentPlayer]);

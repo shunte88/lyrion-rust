@@ -27,6 +27,8 @@ pub struct Playlist {
     pub repeat: u8,
     /// Shuffle mode: 0=off, 1=song, 2=album
     pub shuffle: u8,
+    /// Whether playback is currently active
+    pub playing: bool,
 }
 
 impl Playlist {
@@ -37,6 +39,7 @@ impl Playlist {
             current_index: None,
             repeat: 0,
             shuffle: 0,
+            playing: false,
         }
     }
 
@@ -250,6 +253,33 @@ impl PlaylistManager {
         let track = playlist.jump_to(index).cloned();
         self.set_playlist(player_id, playlist).await;
         track
+    }
+
+    /// Set shuffle mode for a player
+    pub async fn set_shuffle(&self, player_id: &str, mode: u8) {
+        let mut playlist = self.get_playlist(player_id).await;
+        playlist.shuffle = mode;
+        self.set_playlist(player_id, playlist).await;
+    }
+
+    /// Set repeat mode for a player
+    pub async fn set_repeat(&self, player_id: &str, mode: u8) {
+        let mut playlist = self.get_playlist(player_id).await;
+        playlist.repeat = mode;
+        self.set_playlist(player_id, playlist).await;
+    }
+
+    /// Set playing state for a player
+    pub async fn set_playing(&self, player_id: &str, playing: bool) {
+        let mut playlist = self.get_playlist(player_id).await;
+        playlist.playing = playing;
+        self.set_playlist(player_id, playlist).await;
+    }
+
+    /// Get playing state for a player
+    pub async fn is_playing(&self, player_id: &str) -> bool {
+        let playlist = self.get_playlist(player_id).await;
+        playlist.playing
     }
 }
 

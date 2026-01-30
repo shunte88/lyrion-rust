@@ -4,6 +4,7 @@ import { useAppStore } from '../services/store';
 import { useEffect, useState } from 'react';
 import { LyrionAPI } from '../services/api';
 import { SearchModal } from './SearchModal';
+import { PlaybackControls } from './PlaybackControls';
 import { useHotkeys } from '@mantine/hooks';
 
 export function Header() {
@@ -31,22 +32,27 @@ export function Header() {
           <Burger opened={sidebarOpen} onClick={toggleSidebar} size="sm" />
           <Group gap="xs">
             <IconMusic size={28} />
-            <Title order={3}>Lyrion Music Server</Title>
+            <Title order={3}>Lyrion</Title>
           </Group>
         </Group>
 
         <Group gap="md">
+          <PlaybackControls />
+
           <Select
             placeholder="Select player"
             leftSection={<IconDeviceSpeaker style={{ width: rem(16), height: rem(16) }} />}
             data={players.map((p) => ({
-              value: p.mac || p.id,
+              value: p.mac || p.uuid || p.id || '',
               label: p.name || p.mac || 'Unknown Player'
             }))}
-            value={currentPlayer?.mac || currentPlayer?.id}
+            value={currentPlayer?.mac || currentPlayer?.uuid || currentPlayer?.id}
             onChange={(value) => {
-              const player = players.find((p) => (p.mac || p.id) === value);
-              if (player) setCurrentPlayer(player);
+              const player = players.find((p) => (p.mac || p.uuid || p.id) === value);
+              if (player) {
+                // Use MAC as the primary ID (UUID can be all zeros for some players)
+                setCurrentPlayer({ ...player, id: player.mac || player.uuid || player.id });
+              }
             }}
             style={{ width: 200 }}
           />

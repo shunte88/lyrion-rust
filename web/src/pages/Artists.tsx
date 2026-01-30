@@ -3,6 +3,7 @@ import { Stack, Title, Table, ActionIcon, Group, Loader, Text, Badge } from '@ma
 import { IconPlayerPlay, IconRefresh } from '@tabler/icons-react';
 import { useAppStore } from '../services/store';
 import { LyrionAPI } from '../services/api';
+import { playTracks } from '../services/playerUtils';
 import { notifications } from '@mantine/notifications';
 
 interface Artist {
@@ -79,12 +80,9 @@ export function ArtistsPage() {
     if (artistTracks.length === 0) return;
 
     try {
-      // Clear playlist and add all tracks
-      await LyrionAPI.clearPlaylist(currentPlayer.id);
-      for (const track of artistTracks) {
-        await LyrionAPI.addTrack(currentPlayer.id, track.id);
-      }
-      await LyrionAPI.play(currentPlayer.id);
+      // Play all tracks by this artist
+      const trackIds = artistTracks.map((t) => t.id);
+      await playTracks(currentPlayer.mac || currentPlayer.id || currentPlayer.uuid || '', trackIds);
 
       notifications.show({
         title: 'Playing Artist',
