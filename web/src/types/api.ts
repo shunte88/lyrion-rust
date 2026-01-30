@@ -40,11 +40,17 @@ export interface Artist {
 }
 
 export interface Player {
-  id: string;
-  name: string;
-  model: string;
-  connected: boolean;
-  playing: boolean;
+  // API returns mac, device_id, revision, uuid
+  mac?: string;
+  device_id?: number;
+  revision?: number;
+  uuid?: string;
+  // Also support future id/name fields
+  id?: string;
+  name?: string;
+  model?: string;
+  connected?: boolean;
+  playing?: boolean;
   current_track?: Track;
   position?: number;
   duration?: number;

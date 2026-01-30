@@ -25,11 +25,14 @@ impl FormatParser for WavParser {
             title: tag.and_then(|t| t.title().map(|s| s.to_string())),
             artist: tag.and_then(|t| t.artist().map(|s| s.to_string())),
             album: tag.and_then(|t| t.album().map(|s| s.to_string())),
-            album_artist: None,
+            album_artist: tag.and_then(|t| {
+                t.get_string(&lofty::tag::ItemKey::AlbumArtist)
+                    .map(|s| s.to_string())
+            }),
             genre: tag.and_then(|t| t.genre().map(|s| s.to_string())),
             year: tag.and_then(|t| t.year()),
             track_number: tag.and_then(|t| t.track()),
-            disc_number: None,
+            disc_number: tag.and_then(|t| t.disk()),
             duration_ms: Some(properties.duration().as_millis() as u64),
             bitrate: properties.audio_bitrate().map(|b| b as u32),
             sample_rate: properties.sample_rate(),
@@ -38,6 +41,13 @@ impl FormatParser for WavParser {
             format: "wav".to_string(),
             artwork: None,
             modified_time,
+            composer: tag.and_then(|t| t.get_string(&lofty::tag::ItemKey::Composer).map(|s| s.to_string())),
+            conductor: tag.and_then(|t| t.get_string(&lofty::tag::ItemKey::Conductor).map(|s| s.to_string())),
+            bpm: tag.and_then(|t| t.get_string(&lofty::tag::ItemKey::Bpm).and_then(|s| s.parse::<u16>().ok())),
+            lyrics: tag.and_then(|t| t.get_string(&lofty::tag::ItemKey::Lyrics).map(|s| s.to_string())),
+            musicbrainz_id: tag.and_then(|t| t.get_string(&lofty::tag::ItemKey::MusicBrainzRecordingId).map(|s| s.to_string())),
+            replay_gain: tag.and_then(|t| t.get_string(&lofty::tag::ItemKey::ReplayGainTrackGain).and_then(|s| s.trim_end_matches(" dB").parse::<f32>().ok())),
+            replay_peak: tag.and_then(|t| t.get_string(&lofty::tag::ItemKey::ReplayGainTrackPeak).and_then(|s| s.parse::<f32>().ok())),
         };
 
         // Extract artwork (WAV files can have ID3 tags)

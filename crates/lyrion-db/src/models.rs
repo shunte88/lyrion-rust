@@ -140,8 +140,9 @@ impl Track {
     pub async fn insert(&self, pool: &sqlx::SqlitePool) -> Result<i64, sqlx::Error> {
         let result = sqlx::query(
             "INSERT INTO tracks (url, title, titlesort, titlesearch, album, tracknum, content_type,
-             timestamp, filesize, year, secs, cover, bitrate, samplerate, channels, disc, audio, remote, lossless, metadata_hash)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+             timestamp, filesize, year, secs, cover, bitrate, samplerate, channels, disc, audio, remote, lossless,
+             bpm, lyrics, musicbrainz_id, replay_gain, replay_peak, metadata_hash)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
         )
         .bind(&self.url)
         .bind(&self.title)
@@ -162,6 +163,11 @@ impl Track {
         .bind(self.audio)
         .bind(self.remote)
         .bind(self.lossless)
+        .bind(self.bpm)
+        .bind(&self.lyrics)
+        .bind(&self.musicbrainz_id)
+        .bind(self.replay_gain)
+        .bind(self.replay_peak)
         .bind(&self.metadata_hash)
         .execute(pool)
         .await?;

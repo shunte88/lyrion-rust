@@ -19,6 +19,7 @@ import { useAppStore } from './services/store';
 import { useWebSocket } from './hooks/useWebSocket';
 import { useMediaSession } from './hooks/useMediaSession';
 import { useWakeLock } from './hooks/useWakeLock';
+import { lyrionTheme } from './styles/theme';
 
 import '@mantine/core/styles.css';
 import '@mantine/notifications/styles.css';
@@ -34,7 +35,7 @@ export function App() {
   useWakeLock();
 
   return (
-    <MantineProvider defaultColorScheme="dark">
+    <MantineProvider theme={lyrionTheme} defaultColorScheme="dark">
       <Notifications position="top-right" />
       <BrowserRouter>
         <AppShell

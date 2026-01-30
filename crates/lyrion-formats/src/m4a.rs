@@ -43,6 +43,13 @@ impl FormatParser for M4aParser {
             format: "m4a".to_string(), // Note: Can contain AAC or ALAC codec
             artwork: None,
             modified_time,
+            composer: tag.and_then(|t| t.get_string(&lofty::tag::ItemKey::Composer).map(|s| s.to_string())),
+            conductor: tag.and_then(|t| t.get_string(&lofty::tag::ItemKey::Conductor).map(|s| s.to_string())),
+            bpm: tag.and_then(|t| t.get_string(&lofty::tag::ItemKey::Bpm).and_then(|s| s.parse::<u16>().ok())),
+            lyrics: tag.and_then(|t| t.get_string(&lofty::tag::ItemKey::Lyrics).map(|s| s.to_string())),
+            musicbrainz_id: tag.and_then(|t| t.get_string(&lofty::tag::ItemKey::MusicBrainzRecordingId).map(|s| s.to_string())),
+            replay_gain: tag.and_then(|t| t.get_string(&lofty::tag::ItemKey::ReplayGainTrackGain).and_then(|s| s.trim_end_matches(" dB").parse::<f32>().ok())),
+            replay_peak: tag.and_then(|t| t.get_string(&lofty::tag::ItemKey::ReplayGainTrackPeak).and_then(|s| s.parse::<f32>().ok())),
         };
 
         // Extract artwork

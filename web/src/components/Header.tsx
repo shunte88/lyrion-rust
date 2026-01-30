@@ -39,10 +39,13 @@ export function Header() {
           <Select
             placeholder="Select player"
             leftSection={<IconDeviceSpeaker style={{ width: rem(16), height: rem(16) }} />}
-            data={players.map((p) => ({ value: p.id, label: p.name }))}
-            value={currentPlayer?.id}
+            data={players.map((p) => ({
+              value: p.mac || p.id,
+              label: p.name || p.mac || 'Unknown Player'
+            }))}
+            value={currentPlayer?.mac || currentPlayer?.id}
             onChange={(value) => {
-              const player = players.find((p) => p.id === value);
+              const player = players.find((p) => (p.mac || p.id) === value);
               if (player) setCurrentPlayer(player);
             }}
             style={{ width: 200 }}

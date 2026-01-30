@@ -36,6 +36,13 @@ pub struct AudioMetadata {
     pub format: String,
     pub artwork: Option<Vec<u8>>,
     pub modified_time: Option<NaiveDateTime>,
+    pub composer: Option<String>,
+    pub conductor: Option<String>,
+    pub bpm: Option<u16>,
+    pub lyrics: Option<String>,
+    pub musicbrainz_id: Option<String>,
+    pub replay_gain: Option<f32>,
+    pub replay_peak: Option<f32>,
 }
 
 /// Trait for format-specific parsers

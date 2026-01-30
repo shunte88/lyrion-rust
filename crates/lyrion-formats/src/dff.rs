@@ -185,6 +185,13 @@ impl FormatParser for DffParser {
             format: format!("dff:dsd{}", dsd_rate),
             artwork: None,
             modified_time,
+            composer: None,
+            conductor: None,
+            bpm: None,
+            lyrics: None,
+            musicbrainz_id: None,
+            replay_gain: None,
+            replay_peak: None,
         };
 
         Ok(metadata)

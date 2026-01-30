@@ -97,6 +97,13 @@ impl FormatParser for DsfParser {
             format: format!("dsf:dsd{}", dsd_rate),
             artwork: None,
             modified_time,
+            composer: None,
+            conductor: None,
+            bpm: None,
+            lyrics: None,
+            musicbrainz_id: None,
+            replay_gain: None,
+            replay_peak: None,
         };
 
         // Try to read ID3v2 metadata if present
@@ -107,10 +114,18 @@ impl FormatParser for DsfParser {
                     metadata.title = tag.title().map(|s| s.to_string());
                     metadata.artist = tag.artist().map(|s| s.to_string());
                     metadata.album = tag.album().map(|s| s.to_string());
+                    metadata.album_artist = tag.get_string(&lofty::tag::ItemKey::AlbumArtist).map(|s| s.to_string());
                     metadata.genre = tag.genre().map(|s| s.to_string());
                     metadata.year = tag.year();
                     metadata.track_number = tag.track();
                     metadata.disc_number = tag.disk();
+                    metadata.composer = tag.get_string(&lofty::tag::ItemKey::Composer).map(|s| s.to_string());
+                    metadata.conductor = tag.get_string(&lofty::tag::ItemKey::Conductor).map(|s| s.to_string());
+                    metadata.bpm = tag.get_string(&lofty::tag::ItemKey::Bpm).and_then(|s| s.parse::<u16>().ok());
+                    metadata.lyrics = tag.get_string(&lofty::tag::ItemKey::Lyrics).map(|s| s.to_string());
+                    metadata.musicbrainz_id = tag.get_string(&lofty::tag::ItemKey::MusicBrainzRecordingId).map(|s| s.to_string());
+                    metadata.replay_gain = tag.get_string(&lofty::tag::ItemKey::ReplayGainTrackGain).and_then(|s| s.trim_end_matches(" dB").parse::<f32>().ok());
+                    metadata.replay_peak = tag.get_string(&lofty::tag::ItemKey::ReplayGainTrackPeak).and_then(|s| s.parse::<f32>().ok());
 
                     // Extract artwork
                     if let Some(picture) = tag.pictures().first() {

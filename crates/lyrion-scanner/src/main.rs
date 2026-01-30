@@ -300,6 +300,24 @@ fn compute_metadata_hash(metadata: &AudioMetadata, cover_size: Option<usize>) ->
     if let Some(g) = &metadata.genre {
         hasher.update(g.as_bytes());
     }
+    if let Some(c) = &metadata.composer {
+        hasher.update(c.as_bytes());
+    }
+    if let Some(c) = &metadata.conductor {
+        hasher.update(c.as_bytes());
+    }
+    if let Some(b) = metadata.bpm {
+        hasher.update(&b.to_le_bytes());
+    }
+    if let Some(l) = &metadata.lyrics {
+        hasher.update(l.chars().take(100).collect::<String>().as_bytes());
+    }
+    if let Some(m) = &metadata.musicbrainz_id {
+        hasher.update(m.as_bytes());
+    }
+    if let Some(rg) = metadata.replay_gain {
+        hasher.update(&rg.to_le_bytes());
+    }
     // Hash cover art size (not full data for performance)
     if let Some(size) = cover_size {
         hasher.update(&size.to_le_bytes());
@@ -458,7 +476,7 @@ async fn process_audio_file_with_options(
         channels: metadata.channels.map(|c| c as i8),
         block_alignment: None,
         endian: None,
-        bpm: None,
+        bpm: metadata.bpm.map(|b| b as i16),
         tagversion: None,
         drm: Some(false),
         disc: metadata.disc_number.map(|d| d as i8),
@@ -469,11 +487,11 @@ async fn process_audio_file_with_options(
                 || metadata.format.starts_with("dsf:")
                 || metadata.format.starts_with("dff:")
         ),
-        lyrics: None,
-        musicbrainz_id: None,
+        lyrics: metadata.lyrics.clone(),
+        musicbrainz_id: metadata.musicbrainz_id.clone(),
         musicmagic_mixable: None,
-        replay_gain: None,
-        replay_peak: None,
+        replay_gain: metadata.replay_gain,
+        replay_peak: metadata.replay_peak,
         extid: None,
         metadata_hash: Some(current_hash),
     };
@@ -493,6 +511,41 @@ async fn process_audio_file_with_options(
         .bind(track_id)
         .execute(db_pool)
         .await?;
+    }
+
+    // Link composer
+    if let Some(composer_name) = &metadata.composer {
+        let composer_id = Contributor::find_or_create(db_pool, composer_name).await?;
+        sqlx::query("INSERT OR IGNORE INTO contributor_track (role, contributor, track) VALUES (?, ?, ?)")
+            .bind(roles::COMPOSER)
+            .bind(composer_id)
+            .bind(track_id)
+            .execute(db_pool)
+            .await?;
+    }
+
+    // Link conductor
+    if let Some(conductor_name) = &metadata.conductor {
+        let conductor_id = Contributor::find_or_create(db_pool, conductor_name).await?;
+        sqlx::query("INSERT OR IGNORE INTO contributor_track (role, contributor, track) VALUES (?, ?, ?)")
+            .bind(roles::CONDUCTOR)
+            .bind(conductor_id)
+            .bind(track_id)
+            .execute(db_pool)
+            .await?;
+    }
+
+    // Link album artist if different from track artist
+    if let Some(album_artist_name) = &metadata.album_artist {
+        if metadata.artist.as_ref() != Some(album_artist_name) {
+            let album_artist_id = Contributor::find_or_create(db_pool, album_artist_name).await?;
+            sqlx::query("INSERT OR IGNORE INTO contributor_track (role, contributor, track) VALUES (?, ?, ?)")
+                .bind(roles::ALBUMARTIST)
+                .bind(album_artist_id)
+                .bind(track_id)
+                .execute(db_pool)
+                .await?;
+        }
     }
 
     // Link genre
@@ -625,7 +678,7 @@ async fn delete_and_reinsert(
         channels: metadata.channels.map(|c| c as i8),
         block_alignment: None,
         endian: None,
-        bpm: None,
+        bpm: metadata.bpm.map(|b| b as i16),
         tagversion: None,
         drm: Some(false),
         disc: metadata.disc_number.map(|d| d as i8),
@@ -636,11 +689,11 @@ async fn delete_and_reinsert(
                 || metadata.format.starts_with("dsf:")
                 || metadata.format.starts_with("dff:")
         ),
-        lyrics: None,
-        musicbrainz_id: None,
+        lyrics: metadata.lyrics.clone(),
+        musicbrainz_id: metadata.musicbrainz_id.clone(),
         musicmagic_mixable: None,
-        replay_gain: None,
-        replay_peak: None,
+        replay_gain: metadata.replay_gain,
+        replay_peak: metadata.replay_peak,
         extid: None,
         metadata_hash: Some(hash.to_string()),
     };
@@ -658,6 +711,41 @@ async fn delete_and_reinsert(
         .bind(new_track_id)
         .execute(db_pool)
         .await?;
+    }
+
+    // Link composer
+    if let Some(composer_name) = &metadata.composer {
+        let composer_id = Contributor::find_or_create(db_pool, composer_name).await?;
+        sqlx::query("INSERT OR IGNORE INTO contributor_track (role, contributor, track) VALUES (?, ?, ?)")
+            .bind(roles::COMPOSER)
+            .bind(composer_id)
+            .bind(new_track_id)
+            .execute(db_pool)
+            .await?;
+    }
+
+    // Link conductor
+    if let Some(conductor_name) = &metadata.conductor {
+        let conductor_id = Contributor::find_or_create(db_pool, conductor_name).await?;
+        sqlx::query("INSERT OR IGNORE INTO contributor_track (role, contributor, track) VALUES (?, ?, ?)")
+            .bind(roles::CONDUCTOR)
+            .bind(conductor_id)
+            .bind(new_track_id)
+            .execute(db_pool)
+            .await?;
+    }
+
+    // Link album artist if different from track artist
+    if let Some(album_artist_name) = &metadata.album_artist {
+        if metadata.artist.as_ref() != Some(album_artist_name) {
+            let album_artist_id = Contributor::find_or_create(db_pool, album_artist_name).await?;
+            sqlx::query("INSERT OR IGNORE INTO contributor_track (role, contributor, track) VALUES (?, ?, ?)")
+                .bind(roles::ALBUMARTIST)
+                .bind(album_artist_id)
+                .bind(new_track_id)
+                .execute(db_pool)
+                .await?;
+        }
     }
 
     // Link genre
