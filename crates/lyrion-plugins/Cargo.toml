@@ -1,0 +1,23 @@
+[package]
+name = "lyrion-plugins"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+sqlx = { workspace = true }
+libloading = "0.8"
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+toml = "0.8"
+
+# Optional WASM support
+wasmtime = { version = "28.0", optional = true }
+
+[features]
+default = []
+wasm = ["wasmtime"]

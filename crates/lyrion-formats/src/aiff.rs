@@ -1,0 +1,75 @@
+//! AIFF (Audio Interchange File Format) parser using lofty
+//! Supports AIFF, AIFF-C (compressed), and AIFC formats
+
+use crate::{AudioMetadata, FormatParser};
+use anyhow::Result;
+use lofty::prelude::*;
+use lofty::probe::Probe;
+use std::fs;
+
+pub struct AiffParser;
+
+impl FormatParser for AiffParser {
+    fn parse(&self, path: &str) -> Result<AudioMetadata> {
+        let tagged_file = Probe::open(path)?.read()?;
+
+        let properties = tagged_file.properties();
+        let tag = tagged_file.primary_tag().or(tagged_file.first_tag());
+
+        let file_metadata = fs::metadata(path)?;
+        let modified_time = file_metadata
+            .modified()
+            .ok()
+            .map(|t| chrono::DateTime::<chrono::Utc>::from(t).naive_utc());
+
+        let mut metadata = AudioMetadata {
+            title: tag.and_then(|t| t.title().map(|s| s.to_string())),
+            artist: tag.and_then(|t| t.artist().map(|s| s.to_string())),
+            album: tag.and_then(|t| t.album().map(|s| s.to_string())),
+            album_artist: tag.and_then(|t| {
+                t.get_string(&lofty::tag::ItemKey::AlbumArtist)
+                    .map(|s| s.to_string())
+            }),
+            genre: tag.and_then(|t| t.genre().map(|s| s.to_string())),
+            year: tag.and_then(|t| t.year()),
+            track_number: tag.and_then(|t| t.track()),
+            disc_number: tag.and_then(|t| t.disk()),
+            duration_ms: Some(properties.duration().as_millis() as u64),
+            bitrate: properties.audio_bitrate().map(|b| b as u32),
+            sample_rate: properties.sample_rate(),
+            channels: properties.channels().map(|c| c as u8),
+            file_size: file_metadata.len(),
+            format: "aiff".to_string(),
+            artwork: None,
+            modified_time,
+        };
+
+        // Extract artwork
+        if let Some(tag) = tag {
+            if let Some(picture) = tag.pictures().first() {
+                metadata.artwork = Some(picture.data().to_vec());
+            }
+        }
+
+        Ok(metadata)
+    }
+
+    fn supports_extension(&self, ext: &str) -> bool {
+        matches!(ext.to_lowercase().as_str(), "aiff" | "aif" | "aifc")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_aiff_parser_supports() {
+        let parser = AiffParser;
+        assert!(parser.supports_extension("aiff"));
+        assert!(parser.supports_extension("aif"));
+        assert!(parser.supports_extension("aifc"));
+        assert!(parser.supports_extension("AIFF"));
+        assert!(!parser.supports_extension("wav"));
+    }
+}

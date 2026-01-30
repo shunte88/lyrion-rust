@@ -1,0 +1,15 @@
+[plugin]
+name = "RandomPlay"
+version = "1.0.0"
+author = "Lyrion Community"
+description = "Generate random playlists by track, album, artist, or year"
+min_server_version = "0.1.0"
+
+[dependencies]
+# No dependencies
+
+[capabilities]
+capabilities = ["cli", "http"]
+
+[config]
+enforced = false

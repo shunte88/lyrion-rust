@@ -1,0 +1,97 @@
+// Add these types at the beginning after imports
+
+#[derive(Debug, Clone, Copy)]
+enum ProcessStatus {
+    Created,
+    Updated,
+    Skipped,
+}
+
+// Add this wrapper function that uses options
+async fn process_audio_file_with_options(
+    path: &Path,
+    db_pool: &sqlx::SqlitePool,
+    options: &ScanOptions,
+) -> Result<ProcessStatus> {
+    let path_str = path.to_string_lossy().to_string();
+
+    // Get file metadata for timestamp checking
+    let file_metadata = std::fs::metadata(path)?;
+    let file_mtime = file_metadata.modified()?
+        .duration_since(std::time::UNIX_EPOCH)?
+        .as_secs() as i64;
+
+    // Check if already in database with timestamp
+    let existing: Option<(i64, Option<i64>)> = sqlx::query_as(
+        "SELECT id, timestamp FROM tracks WHERE url = ?"
+    )
+    .bind(&path_str)
+    .fetch_optional(db_pool)
+    .await?;
+
+    // If exists and not modified (and not force rescan), skip
+    if let Some((track_id, db_timestamp)) = existing {
+        if !options.force_rescan {
+            if let Some(ts) = db_timestamp {
+                if ts >= file_mtime {
+                    // File hasn't been modified, skip
+                    return Ok(ProcessStatus::Skipped);
+                }
+            }
+        }
+        
+        // File has been modified or force rescan, update it
+        if options.update_artwork_only {
+            update_track_artwork_only(track_id, path, db_pool).await?;
+        } else {
+            update_track(track_id, path, db_pool, file_mtime).await?;
+        }
+        return Ok(ProcessStatus::Updated);
+    }
+
+    // New file - insert it (unless update-artwork-only mode)
+    if options.update_artwork_only {
+        return Ok(ProcessStatus::Skipped);
+    }
+
+    // Original process_audio_file logic for new files
+    process_audio_file_new(path, db_pool, file_mtime).await?;
+    Ok(ProcessStatus::Created)
+}
+
+// Update only cover art for existing track
+async fn update_track_artwork_only(track_id: i64, path: &Path, db_pool: &sqlx::SqlitePool) -> Result<()> {
+    let path_str = path.to_string_lossy().to_string();
+    
+    // Parse metadata to get embedded artwork
+    let metadata = parse_file(&path_str)?;
+    
+    // Get cover art (embedded or folder)
+    let cover_art = metadata.artwork.clone()
+        .or_else(|| find_folder_cover_art(path));
+    
+    if cover_art.is_some() {
+        // Update only cover art
+        sqlx::query("UPDATE tracks SET cover = ? WHERE id = ?")
+            .bind(&cover_art)
+            .bind(track_id)
+            .execute(db_pool)
+            .await?;
+    }
+    
+    Ok(())
+}
+
+// Original new file processing logic
+async fn process_audio_file_new(path: &Path, db_pool: &sqlx::SqlitePool, file_mtime: i64) -> Result<()> {
+    let path_str = path.to_string_lossy().to_string();
+    
+    // Parse metadata
+    let metadata = parse_file(&path_str)?;
+
+    // Get cover art (embedded or folder)
+    let cover_art = metadata.artwork.clone()
+        .or_else(|| find_folder_cover_art(path));
+
+    // ... rest of the original process_audio_file logic continues
+    // (Get or create album, insert track, link artist, link genre)

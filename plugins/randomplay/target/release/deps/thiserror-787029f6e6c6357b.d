@@ -1,0 +1,14 @@
+/data2/slimserver/lyrion-rust/plugins/randomplay/target/release/deps/libthiserror-787029f6e6c6357b.rmeta: /home/stuart/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/lib.rs /home/stuart/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/aserror.rs /home/stuart/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/display.rs /home/stuart/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/var.rs /home/stuart/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/private.rs /data2/slimserver/lyrion-rust/plugins/randomplay/target/release/build/thiserror-175cdd5b749ebf64/out/private.rs
+
+/data2/slimserver/lyrion-rust/plugins/randomplay/target/release/deps/libthiserror-787029f6e6c6357b.rlib: /home/stuart/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/lib.rs /home/stuart/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/aserror.rs /home/stuart/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/display.rs /home/stuart/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/var.rs /home/stuart/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/private.rs /data2/slimserver/lyrion-rust/plugins/randomplay/target/release/build/thiserror-175cdd5b749ebf64/out/private.rs
+
+/data2/slimserver/lyrion-rust/plugins/randomplay/target/release/deps/thiserror-787029f6e6c6357b.d: /home/stuart/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/lib.rs /home/stuart/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/aserror.rs /home/stuart/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/display.rs /home/stuart/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/var.rs /home/stuart/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/private.rs /data2/slimserver/lyrion-rust/plugins/randomplay/target/release/build/thiserror-175cdd5b749ebf64/out/private.rs
+
+/home/stuart/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/lib.rs:
+/home/stuart/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/aserror.rs:
+/home/stuart/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/display.rs:
+/home/stuart/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/var.rs:
+/home/stuart/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/private.rs:
+/data2/slimserver/lyrion-rust/plugins/randomplay/target/release/build/thiserror-175cdd5b749ebf64/out/private.rs:
+
+# env-dep:OUT_DIR=/data2/slimserver/lyrion-rust/plugins/randomplay/target/release/build/thiserror-175cdd5b749ebf64/out
